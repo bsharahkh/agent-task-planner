@@ -32,23 +32,6 @@ class AgentConfigTests(unittest.TestCase):
             os.environ.clear()
             os.environ.update(old_env)
 
-    def test_resolved_openai_api_key_reads_named_system_env_var(self) -> None:
-        old_env = dict(os.environ)
-        try:
-            os.environ["TASK_AGENT_SYSTEM_OPENAI_KEY"] = "system-key"
-            config = AgentConfig(
-                neo4j_uri="bolt://localhost:7687",
-                neo4j_user="neo4j",
-                neo4j_password="secret",
-                openai_api_key="",
-                openai_api_key_env="TASK_AGENT_SYSTEM_OPENAI_KEY",
-            )
-            self.assertEqual(config.resolved_openai_api_key(), "system-key")
-            config.validate()
-        finally:
-            os.environ.clear()
-            os.environ.update(old_env)
-
 
 if __name__ == "__main__":
     unittest.main()

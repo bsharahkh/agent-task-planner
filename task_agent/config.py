@@ -14,7 +14,6 @@ class AgentConfig:
     neo4j_user: str = "neo4j"
     neo4j_password: str = ""
     openai_api_key: str = ""
-    openai_api_key_env: str = ""
     openai_base_url: str | None = None
     openai_model: str = "gpt-5.3-codex"
     openai_reasoning_effort: str = "medium"
@@ -32,7 +31,6 @@ class AgentConfig:
             neo4j_user=os.getenv("NEO4J_USER", cls.neo4j_user).strip(),
             neo4j_password=os.getenv("NEO4J_PASSWORD", "").strip(),
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
-            openai_api_key_env=os.getenv("OPENAI_API_KEY_ENV", "").strip(),
             openai_base_url=(os.getenv("OPENAI_BASE_URL") or "").strip() or None,
             openai_model=os.getenv("OPENAI_MODEL", cls.openai_model).strip(),
             openai_reasoning_effort=os.getenv("OPENAI_REASONING_EFFORT", cls.openai_reasoning_effort).strip(),
@@ -44,15 +42,6 @@ class AgentConfig:
             max_children=int(os.getenv("TASK_AGENT_MAX_CHILDREN", str(cls.max_children))),
         )
 
-    def resolved_openai_api_key(self) -> str:
-        if self.openai_api_key:
-            return self.openai_api_key
-
-        if self.openai_api_key_env:
-            return os.getenv(self.openai_api_key_env, "").strip()
-
-        return ""
-
     def validate(self) -> None:
         missing_vars: list[str] = []
 
@@ -62,11 +51,8 @@ class AgentConfig:
             missing_vars.append("NEO4J_USER")
         if not self.neo4j_password:
             missing_vars.append("NEO4J_PASSWORD")
-        if not self.resolved_openai_api_key():
-            if self.openai_api_key_env:
-                missing_vars.append(f"{self.openai_api_key_env} (referenced by OPENAI_API_KEY_ENV)")
-            else:
-                missing_vars.append("OPENAI_API_KEY or OPENAI_API_KEY_ENV")
+        if not self.openai_api_key:
+            missing_vars.append("OPENAI_API_KEY")
 
         if missing_vars:
             joined = ", ".join(missing_vars)

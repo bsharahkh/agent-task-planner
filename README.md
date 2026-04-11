@@ -44,15 +44,7 @@ TASK_AGENT_RETRY_DELAY_SECONDS=1.5
 TASK_AGENT_LOG_LEVEL=INFO
 ```
 
-`NEO4J_PASSWORD` is required, and the OpenAI key must be provided either directly through `OPENAI_API_KEY` or indirectly through `OPENAI_API_KEY_ENV`.
-
-If you do not want to store the literal API key in `.env`, you can point to a system environment variable instead:
-
-```bash
-OPENAI_API_KEY_ENV=MY_OPENAI_KEY
-```
-
-Then set `MY_OPENAI_KEY` in your Windows user or system environment. The app will resolve the key from there at runtime.
+`NEO4J_PASSWORD` and `OPENAI_API_KEY` are required. The agent now fails fast at startup if either is missing.
 
 ## Run
 
