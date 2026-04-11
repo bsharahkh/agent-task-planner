@@ -58,6 +58,7 @@ def main() -> int:
 
     configure_logging(config.log_level)
     logger.info("Starting recursive task agent.")
+    api_key = config.resolved_openai_api_key()
 
     store = TaskGraphStore(
         uri=config.neo4j_uri,
@@ -68,7 +69,7 @@ def main() -> int:
     agent = RecursiveTaskAgent(
         store=store,
         llm_client=OpenAIResponsesClient(
-            api_key=config.openai_api_key,
+            api_key=api_key,
             base_url=config.openai_base_url,
             model=config.openai_model,
             reasoning_effort=config.openai_reasoning_effort,
