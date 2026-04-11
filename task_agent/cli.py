@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+from pathlib import Path
 
 from task_agent.agent import RecursiveTaskAgent
 from task_agent.config import AgentConfig, ConfigError
 from task_agent.env import load_dotenv
-from task_agent.llm import OpenAIResponsesClient
+from task_agent.llm import CodexCLIClient
 from task_agent.logging_utils import configure_logging
 from task_agent.storage import TaskGraphStore
 
@@ -26,12 +27,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--max-depth", type=int, default=None, help="Override the maximum recursion depth.")
     parser.add_argument("--max-children", type=int, default=None, help="Override the maximum number of child tasks.")
-    parser.add_argument("--model", default=None, help="Override the OpenAI model, defaults to OPENAI_MODEL.")
+    parser.add_argument("--model", default=None, help="Override the Codex model, defaults to CODEX_MODEL.")
     parser.add_argument(
-        "--reasoning-effort",
+        "--profile",
         default=None,
-        choices=["minimal", "low", "medium", "high", "xhigh"],
-        help="Override the OpenAI reasoning effort.",
+        help="Override the Codex CLI profile, defaults to CODEX_PROFILE.",
+    )
+    parser.add_argument(
+        "--sandbox",
+        default=None,
+        choices=["read-only", "workspace-write", "danger-full-access"],
+        help="Override the Codex sandbox mode.",
     )
     return parser
 
@@ -47,9 +53,11 @@ def main() -> int:
     if args.max_children is not None:
         config.max_children = args.max_children
     if args.model is not None:
-        config.openai_model = args.model
-    if args.reasoning_effort is not None:
-        config.openai_reasoning_effort = args.reasoning_effort
+        config.codex_model = args.model
+    if args.profile is not None:
+        config.codex_profile = args.profile
+    if args.sandbox is not None:
+        config.codex_sandbox = args.sandbox
 
     try:
         config.validate()
@@ -58,6 +66,7 @@ def main() -> int:
 
     configure_logging(config.log_level)
     logger.info("Starting recursive task agent.")
+    workspace = str(Path.cwd())
 
     store = TaskGraphStore(
         uri=config.neo4j_uri,
@@ -65,17 +74,19 @@ def main() -> int:
         password=config.neo4j_password,
     )
     store.verify_connection()
+    executor = CodexCLIClient(
+        workspace=workspace,
+        model=config.codex_model,
+        profile=config.codex_profile,
+        sandbox=config.codex_sandbox,
+        timeout_seconds=config.codex_timeout_seconds,
+        max_retries=config.codex_max_retries,
+        retry_delay_seconds=config.retry_delay_seconds,
+    )
+    executor.verify_installation()
     agent = RecursiveTaskAgent(
         store=store,
-        llm_client=OpenAIResponsesClient(
-            api_key=config.openai_api_key,
-            base_url=config.openai_base_url,
-            model=config.openai_model,
-            reasoning_effort=config.openai_reasoning_effort,
-            timeout_seconds=config.openai_timeout_seconds,
-            max_retries=config.openai_max_retries,
-            retry_delay_seconds=config.retry_delay_seconds,
-        ),
+        llm_client=executor,
         max_depth=config.max_depth,
         max_children=config.max_children,
     )
