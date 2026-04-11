@@ -38,6 +38,10 @@ NEO4J_PASSWORD=your_password
 OPENAI_API_KEY=your_openai_key
 OPENAI_MODEL=gpt-5.3-codex
 OPENAI_REASONING_EFFORT=medium
+OPENAI_TIMEOUT_SECONDS=60
+OPENAI_MAX_RETRIES=3
+TASK_AGENT_RETRY_DELAY_SECONDS=1.5
+TASK_AGENT_LOG_LEVEL=INFO
 ```
 
 `NEO4J_PASSWORD` and `OPENAI_API_KEY` are required. The agent now fails fast at startup if either is missing.
@@ -47,6 +51,8 @@ OPENAI_REASONING_EFFORT=medium
 ```bash
 python recursive_task_agent.py "Build an internal research assistant"
 ```
+
+The CLI automatically loads a local `.env` file when present, verifies Neo4j connectivity on startup, and retries OpenAI requests using the configured retry settings.
 
 ## Codex usage
 

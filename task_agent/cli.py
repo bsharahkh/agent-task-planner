@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from task_agent.agent import RecursiveTaskAgent
 from task_agent.config import AgentConfig, ConfigError
+from task_agent.env import load_dotenv
 from task_agent.llm import OpenAIResponsesClient
+from task_agent.logging_utils import configure_logging
 from task_agent.storage import TaskGraphStore
+
+logger = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    load_dotenv()
     parser = build_parser()
     args = parser.parse_args()
 
@@ -50,11 +56,15 @@ def main() -> int:
     except ConfigError as exc:
         parser.error(str(exc))
 
+    configure_logging(config.log_level)
+    logger.info("Starting recursive task agent.")
+
     store = TaskGraphStore(
         uri=config.neo4j_uri,
         user=config.neo4j_user,
         password=config.neo4j_password,
     )
+    store.verify_connection()
     agent = RecursiveTaskAgent(
         store=store,
         llm_client=OpenAIResponsesClient(
@@ -62,6 +72,9 @@ def main() -> int:
             base_url=config.openai_base_url,
             model=config.openai_model,
             reasoning_effort=config.openai_reasoning_effort,
+            timeout_seconds=config.openai_timeout_seconds,
+            max_retries=config.openai_max_retries,
+            retry_delay_seconds=config.retry_delay_seconds,
         ),
         max_depth=config.max_depth,
         max_children=config.max_children,

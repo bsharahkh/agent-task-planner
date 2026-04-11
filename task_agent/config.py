@@ -17,6 +17,10 @@ class AgentConfig:
     openai_base_url: str | None = None
     openai_model: str = "gpt-5.3-codex"
     openai_reasoning_effort: str = "medium"
+    openai_timeout_seconds: float = 60.0
+    openai_max_retries: int = 3
+    retry_delay_seconds: float = 1.5
+    log_level: str = "INFO"
     max_depth: int = 50
     max_children: int = 50
 
@@ -30,6 +34,10 @@ class AgentConfig:
             openai_base_url=(os.getenv("OPENAI_BASE_URL") or "").strip() or None,
             openai_model=os.getenv("OPENAI_MODEL", cls.openai_model).strip(),
             openai_reasoning_effort=os.getenv("OPENAI_REASONING_EFFORT", cls.openai_reasoning_effort).strip(),
+            openai_timeout_seconds=float(os.getenv("OPENAI_TIMEOUT_SECONDS", str(cls.openai_timeout_seconds))),
+            openai_max_retries=int(os.getenv("OPENAI_MAX_RETRIES", str(cls.openai_max_retries))),
+            retry_delay_seconds=float(os.getenv("TASK_AGENT_RETRY_DELAY_SECONDS", str(cls.retry_delay_seconds))),
+            log_level=os.getenv("TASK_AGENT_LOG_LEVEL", cls.log_level).strip() or cls.log_level,
             max_depth=int(os.getenv("TASK_AGENT_MAX_DEPTH", str(cls.max_depth))),
             max_children=int(os.getenv("TASK_AGENT_MAX_CHILDREN", str(cls.max_children))),
         )
@@ -54,3 +62,9 @@ class AgentConfig:
             raise ConfigError("TASK_AGENT_MAX_DEPTH must be at least 1.")
         if self.max_children < 1:
             raise ConfigError("TASK_AGENT_MAX_CHILDREN must be at least 1.")
+        if self.openai_max_retries < 1:
+            raise ConfigError("OPENAI_MAX_RETRIES must be at least 1.")
+        if self.retry_delay_seconds < 0:
+            raise ConfigError("TASK_AGENT_RETRY_DELAY_SECONDS must be zero or greater.")
+        if self.openai_timeout_seconds <= 0:
+            raise ConfigError("OPENAI_TIMEOUT_SECONDS must be greater than 0.")

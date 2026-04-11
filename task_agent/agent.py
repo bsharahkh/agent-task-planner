@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from task_agent.llm import LLMClient
 from task_agent.models import TaskChildSpec, TaskDecision, TaskNode, TaskStatus
@@ -12,6 +13,8 @@ from task_agent.prompts import (
 from task_agent.storage import TaskGraphStore
 from task_agent.utils import new_id, safe_json_loads
 
+logger = logging.getLogger(__name__)
+
 
 class RecursiveTaskAgent:
     def __init__(self, *, store: TaskGraphStore, llm_client: LLMClient, max_depth: int = 8, max_children: int = 6):
@@ -22,6 +25,7 @@ class RecursiveTaskAgent:
 
     def run(self, root_prompt: str) -> str:
         root_task = self._build_root_task(root_prompt)
+        logger.info("Creating root task %s", root_task.task_id)
         self.store.upsert_task(root_task)
         self._process_task(root_task.task_id)
         return root_task.task_id
@@ -43,6 +47,7 @@ class RecursiveTaskAgent:
         if task is None or task.status in {TaskStatus.DONE, TaskStatus.BLOCKED}:
             return
 
+        logger.info("Processing task %s at depth %s", task_id, task.depth if task else "unknown")
         self.store.update_task(task_id, status=TaskStatus.ONGOING)
         task = self.store.get_task(task_id) or task
 
@@ -64,7 +69,9 @@ class RecursiveTaskAgent:
 
             result = self._execute(task)
             self.store.update_task(task.task_id, status=TaskStatus.DONE, result=result, error=None)
+            logger.info("Completed task %s", task.task_id)
         except Exception as exc:
+            logger.exception("Task %s failed: %s", task_id, exc)
             self.store.update_task(task.task_id, status=TaskStatus.FAILED, error=str(exc))
 
     def _expand_task(self, task: TaskNode, decision: TaskDecision) -> None:
@@ -79,6 +86,7 @@ class RecursiveTaskAgent:
             status=TaskStatus.NEEDS_BREAKDOWN,
             meta={**task.meta, "split_reason": decision.reason},
         )
+        logger.info("Split task %s into %s children", task.task_id, len(children))
 
         for child in children:
             child_prompt = child.prompt.strip()
@@ -196,5 +204,7 @@ Return a final consolidated answer for the parent.
                 user_prompt=aggregation_prompt,
             )
             self.store.update_task(task_id, status=TaskStatus.DONE, result=summary.strip(), error=None)
+            logger.info("Aggregated task %s", task_id)
         except Exception as exc:
+            logger.exception("Aggregation failed for task %s: %s", task_id, exc)
             self.store.update_task(task_id, status=TaskStatus.REOPEN, error=str(exc))

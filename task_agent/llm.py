@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Protocol
+
+from task_agent.utils import retry
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient(Protocol):
@@ -27,6 +32,9 @@ class OpenAIResponsesClient:
         model: str = "gpt-5.3-codex",
         reasoning_effort: str = "medium",
         base_url: str | None = None,
+        timeout_seconds: float = 60.0,
+        max_retries: int = 3,
+        retry_delay_seconds: float = 1.5,
     ) -> None:
         if not api_key:
             raise ValueError("OPENAI_API_KEY is required to use the OpenAI Codex client.")
@@ -42,15 +50,26 @@ class OpenAIResponsesClient:
         if base_url:
             client_kwargs["base_url"] = base_url
 
-        self._client = OpenAI(**client_kwargs)
+        self._client = OpenAI(**client_kwargs, timeout=timeout_seconds, max_retries=0)
         self.model = model
         self.reasoning_effort = reasoning_effort
+        self.max_retries = max_retries
+        self.retry_delay_seconds = retry_delay_seconds
 
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:
-        response = self._client.responses.create(
-            model=self.model,
-            reasoning={"effort": self.reasoning_effort},
-            instructions=system_prompt,
-            input=user_prompt,
+        def _request() -> str:
+            response = self._client.responses.create(
+                model=self.model,
+                reasoning={"effort": self.reasoning_effort},
+                instructions=system_prompt,
+                input=user_prompt,
+            )
+            return response.output_text
+
+        logger.debug("Requesting OpenAI response with model=%s", self.model)
+        response = retry(
+            _request,
+            attempts=self.max_retries,
+            delay_seconds=self.retry_delay_seconds,
         )
-        return response.output_text
+        return response

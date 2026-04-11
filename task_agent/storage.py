@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from neo4j import GraphDatabase
 
 from task_agent.models import TaskNode
 from task_agent.utils import now_iso
+
+logger = logging.getLogger(__name__)
 
 
 class TaskGraphStore:
@@ -15,6 +18,12 @@ class TaskGraphStore:
 
     def close(self) -> None:
         self.driver.close()
+
+    def verify_connection(self) -> None:
+        self.driver.verify_connectivity()
+        with self.driver.session() as session:
+            session.run("RETURN 1").consume()
+        logger.info("Neo4j connectivity verified.")
 
     def _init_schema(self) -> None:
         with self.driver.session() as session:
